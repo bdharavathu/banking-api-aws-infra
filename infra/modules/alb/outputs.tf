@@ -1,0 +1,31 @@
+output "alb_arn" {
+  value = aws_lb.this.arn
+}
+
+output "alb_arn_suffix" {
+  value = aws_lb.this.arn_suffix
+}
+
+output "alb_dns_name" {
+  value = aws_lb.this.dns_name
+}
+
+output "target_group_arn" {
+  value = aws_lb_target_group.app.arn
+}
+
+output "target_group_arn_suffix" {
+  value = aws_lb_target_group.app.arn_suffix
+}
+
+output "https_listener_arn" {
+  value = aws_lb_listener.https.arn
+}
+
+output "api_url" {
+  value = local.use_custom_domain ? "https://${var.domain_name}" : "https://${aws_lb.this.dns_name}"
+}
+
+output "web_acl_name" {
+  value = var.enable_waf ? aws_wafv2_web_acl.this[0].name : null
+}

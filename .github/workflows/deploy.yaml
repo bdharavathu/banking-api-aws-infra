@@ -1,0 +1,129 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/smoke-test.sh"
+      - ".github/workflows/build.yaml"
+      - ".github/workflows/deploy.yaml"
+      - ".github/workflows/validation.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  validation:
+    uses: ./.github/workflows/validation.yaml
+    with:
+      app: true
+      infra: false
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+
+  build:
+    needs: validation
+    uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: read
+      id-token: write
+
+  deploy:
+    name: Deploy to ECS
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      IMAGE: ${{ needs.build.outputs.image }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_APP_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Load deploy parameters
+        run: |
+          aws ssm get-parameters-by-path --path /banking-api/dev/deploy --with-decryption \
+            --query 'Parameters[].[Name,Value]' --output text |
+          while read -r name value; do
+            echo "$(basename "$name" | tr '[:lower:]' '[:upper:]')=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Register task definition
+        id: taskdef
+        run: |
+          aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --query taskDefinition > current.json
+          jq --arg image "$IMAGE" --arg version "$IMAGE_TAG" --arg name "$CONTAINER_NAME" '
+            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+            | .containerDefinitions |= map(
+                if .name == $name then
+                  .image = $image
+                  | .environment = ([.environment[] | select(.name != "APP_VERSION")] + [{name: "APP_VERSION", value: $version}])
+                else . end)
+          ' current.json > taskdef.json
+          arn=$(aws ecs register-task-definition --cli-input-json file://taskdef.json \
+            --query taskDefinition.taskDefinitionArn --output text)
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migrations
+        env:
+          TASK_DEF: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          task_arn=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUP],assignPublicIp=DISABLED}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"$CONTAINER_NAME\",\"command\":[\"alembic\",\"upgrade\",\"head\"]}]}" \
+            --query 'tasks[0].taskArn' --output text)
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task_arn"
+          exit_code=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task_arn" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          aws logs get-log-events --log-group-name "$LOG_GROUP" \
+            --log-stream-name "api/$CONTAINER_NAME/${task_arn##*/}" \
+            --query 'events[].message' --output text || true
+          if [ "$exit_code" != "0" ]; then
+            echo "::error::Migration failed with exit code $exit_code"
+            exit 1
+          fi
+
+      - name: Update service
+        env:
+          TASK_DEF: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
+            --task-definition "$TASK_DEF" >/dev/null
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+          read -r running state < <(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+            --query "services[0].deployments[?status=='PRIMARY'] | [0].[taskDefinition,rolloutState]" --output text)
+          if [ "$running" != "$TASK_DEF" ] || [ "$state" != "COMPLETED" ]; then
+            echo "::error::Deployment rolled back (running=$running state=$state)"
+            exit 1
+          fi
+
+      - name: Smoke test
+        run: |
+          API_KEY=$(aws secretsmanager get-secret-value --secret-id "$API_CLIENT_KEY_SECRET_ARN" \
+            --query SecretString --output text)
+          echo "::add-mask::$API_KEY"
+          insecure=0
+          [[ "$API_URL" == *.elb.amazonaws.com* ]] && insecure=1
+          API_KEY="$API_KEY" INSECURE=$insecure EXPECTED_VERSION="$IMAGE_TAG" ./scripts/smoke-test.sh
+          echo "Deployed $IMAGE to $API_URL" >> "$GITHUB_STEP_SUMMARY"

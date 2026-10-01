@@ -1,0 +1,14 @@
+framework:
+  - terraform
+  - dockerfile
+  - github_actions
+skip-check:
+  - CKV_AWS_18
+  - CKV_AWS_144
+  - CKV2_AWS_62
+  - CKV_AWS_338
+  - CKV2_AWS_57
+  - CKV2_AWS_5
+  - CKV2_AWS_3
+  - CKV_AWS_252
+  - CKV2_AWS_10

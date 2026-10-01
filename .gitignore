@@ -1,0 +1,30 @@
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.coverage
+coverage.xml
+junit.xml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.sarif
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend.hcl
+tfplan
+plan.txt
+crash.log
+
+# Not for the public repo
+*.pdf
+local/

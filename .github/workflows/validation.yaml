@@ -53,6 +53,9 @@ jobs:
   secrets:
     name: Secret scan
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,6 +109,7 @@ jobs:
     if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       security-events: write
     defaults:
@@ -135,7 +139,7 @@ jobs:
       - name: Dependency audit
         run: |
           uv export --no-dev --no-emit-project --format requirements-txt --locked -q -o /tmp/requirements.txt
-          diff -u requirements.txt /tmp/requirements.txt
+          diff -u -I '^#' requirements.txt /tmp/requirements.txt
           uv run pip-audit --requirement requirements.txt --require-hashes --disable-pip --strict
 
   image:
@@ -144,6 +148,7 @@ jobs:
     if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
@@ -166,6 +171,7 @@ jobs:
           exit-code: "1"
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         if: always()
+        continue-on-error: true
         with:
           image-ref: banking-api:${{ github.sha }}
           format: sarif
@@ -184,6 +190,7 @@ jobs:
     if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:

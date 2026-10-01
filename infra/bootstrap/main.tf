@@ -6,6 +6,7 @@ locals {
   oidc_url      = "token.actions.githubusercontent.com"
   oidc_provider = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn
   resource_glob = "${var.project}-*"
+  subject_base  = "repo:${split("/", var.github_repo)[0]}@*/${split("/", var.github_repo)[1]}@*"
 }
 
 resource "aws_kms_key" "state" {
@@ -123,8 +124,8 @@ data "aws_iam_policy_document" "plan_trust" {
       test     = "StringLike"
       variable = "${local.oidc_url}:sub"
       values = [
-        "repo:${var.github_repo}:pull_request",
-        "repo:${var.github_repo}:ref:refs/heads/main",
+        "${local.subject_base}:pull_request",
+        "${local.subject_base}:ref:refs/heads/main",
       ]
     }
   }
@@ -143,9 +144,9 @@ data "aws_iam_policy_document" "apply_trust" {
       values   = ["sts.amazonaws.com"]
     }
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "${local.oidc_url}:sub"
-      values   = ["repo:${var.github_repo}:environment:infra"]
+      values   = ["${local.subject_base}:environment:infra"]
     }
   }
 }

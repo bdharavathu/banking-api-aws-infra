@@ -148,13 +148,18 @@ resource "aws_ecs_task_definition" "this" {
 
     portMappings = [{
       containerPort = var.app_port
+      hostPort      = var.app_port
       protocol      = "tcp"
     }]
 
     linuxParameters = {
       initProcessEnabled = true
-      capabilities       = { drop = ["ALL"] }
+      capabilities       = { add = [], drop = ["ALL"] }
     }
+
+    mountPoints    = []
+    systemControls = []
+    volumesFrom    = []
 
     environment = [
       { name = "ENVIRONMENT", value = var.environment },

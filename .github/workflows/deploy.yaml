@@ -25,7 +25,9 @@ jobs:
       app: true
       infra: false
     permissions:
+      actions: read
       contents: read
+      pull-requests: read
       security-events: write
 
   build:

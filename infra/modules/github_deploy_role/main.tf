@@ -1,5 +1,6 @@
 locals {
-  oidc_host = "token.actions.githubusercontent.com"
+  oidc_host    = "token.actions.githubusercontent.com"
+  subject_base = "repo:${split("/", var.github_repo)[0]}@*/${split("/", var.github_repo)[1]}@*"
 }
 
 data "aws_iam_openid_connect_provider" "github" {
@@ -19,9 +20,9 @@ data "aws_iam_policy_document" "trust" {
       values   = ["sts.amazonaws.com"]
     }
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "${local.oidc_host}:sub"
-      values   = ["repo:${var.github_repo}:environment:${var.github_environment}"]
+      values   = ["${local.subject_base}:environment:${var.github_environment}"]
     }
   }
 }
@@ -39,9 +40,9 @@ data "aws_iam_policy_document" "build_trust" {
       values   = ["sts.amazonaws.com"]
     }
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "${local.oidc_host}:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/${var.build_branch}"]
+      values   = ["${local.subject_base}:ref:refs/heads/${var.build_branch}"]
     }
   }
 }

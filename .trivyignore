@@ -1,0 +1,6 @@
+# Internet-facing ALB is the entry point; protected by WAF, TLS 1.2+, SG
+AVD-AWS-0053
+# ALB access logs only support SSE-S3
+AVD-AWS-0132
+# Tasks need HTTPS egress to ECR/Secrets Manager/Logs via NAT (no endpoints in dev)
+AVD-AWS-0104

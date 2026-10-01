@@ -1,0 +1,13 @@
+region      = "us-east-1"
+github_repo = "your-github-user/banking-api-aws-infra"
+alert_email = "you@example.com"
+
+# allowed_ingress_cidrs = ["203.0.113.10/32"]
+
+# domain_name     = "api.example.com"
+# route53_zone_id = "Z0123456789ABCDEFGHIJ"
+
+# enable_interface_endpoints = true
+# enable_guardduty           = false
+# enable_securityhub         = true
+# ephemeral                  = false

@@ -80,12 +80,38 @@ resource "aws_vpc_security_group_egress_rule" "app_to_db" {
 }
 
 resource "aws_vpc_security_group_egress_rule" "app_https" {
+  count             = var.enable_interface_endpoints ? 0 : 1
   security_group_id = aws_security_group.app.id
-  description       = "HTTPS to AWS APIs (ECR, Secrets Manager, CloudWatch Logs)"
+  description       = "HTTPS to AWS APIs through NAT"
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443
   cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "app_to_endpoints" {
+  count                        = var.enable_interface_endpoints ? 1 : 0
+  security_group_id            = aws_security_group.app.id
+  description                  = "HTTPS to VPC interface endpoints"
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  referenced_security_group_id = var.endpoints_security_group_id
+}
+
+resource "aws_vpc_security_group_egress_rule" "app_to_s3" {
+  count             = var.enable_interface_endpoints ? 1 : 0
+  security_group_id = aws_security_group.app.id
+  description       = "HTTPS to S3 gateway endpoint (image layers)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  prefix_list_id    = var.s3_prefix_list_id
+}
+
+moved {
+  from = aws_vpc_security_group_egress_rule.app_https
+  to   = aws_vpc_security_group_egress_rule.app_https[0]
 }
 
 resource "aws_vpc_security_group_ingress_rule" "db_from_app" {

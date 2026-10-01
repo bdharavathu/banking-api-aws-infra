@@ -10,10 +10,10 @@ flowchart LR
         subgraph vpc["VPC - 2 AZs"]
             subgraph public["Public subnets"]
                 alb["ALB (HTTPS)"]
-                nat["NAT gateway"]
             end
-            subgraph private["Private subnets"]
+            subgraph private["Private subnets (no internet route)"]
                 ecs["ECS Fargate<br/>2-4 tasks"]
+                vpce["VPC endpoints"]
             end
             subgraph db["DB subnets (no internet route)"]
                 rds[("RDS PostgreSQL")]
@@ -29,7 +29,7 @@ flowchart LR
     client -- 443 --> waf --> alb
     alb -- 8000 --> ecs
     ecs -- "5432 (TLS)" --> rds
-    ecs -.-> nat -.-> ecr & sm & cw
+    ecs -.-> vpce -.-> ecr & sm & cw
     cw --> sns
 ```
 
@@ -38,6 +38,7 @@ flowchart LR
 - **Load balancer:** an internet-facing ALB in two public subnets. HTTP redirects to HTTPS, which accepts TLS 1.2 and 1.3 only. AWS WAF is attached with the AWS managed rule sets (common, known bad inputs, SQLi, IP reputation) and a per-IP rate limit.
 - **Application:** a FastAPI service on ECS Fargate in private subnets. It runs 2 tasks across both AZs and autoscales to 4 on CPU and request count. Deployments are rolling, with the ECS circuit breaker set to roll back.
 - **Database:** RDS PostgreSQL 16 in subnets with no internet route. Storage is encrypted with KMS, SSL is enforced (`rds.force_ssl`), and backups are kept for 7 days. The master password is generated and stored by RDS in Secrets Manager.
+- **Private connectivity:** there is no NAT gateway or internet route for the app or database subnets. The tasks reach ECR, CloudWatch Logs and Secrets Manager through VPC interface endpoints, and S3 (image layers) through a gateway endpoint. The app's security group only allows HTTPS to those endpoints, and the database traffic stays inside the VPC.
 - **Registry:** ECR with immutable tags and scan on push.
 
 The service is a small REST API:
@@ -56,7 +57,7 @@ The schema is managed with Alembic. The deploy pipeline runs `alembic upgrade he
 
 ## Security
 
-- **Network:** security groups only allow internet → ALB on 80/443, ALB → app on 8000, and app → DB on 5432. Tasks have no public IPs, and the DB subnets have no route to the internet.
+- **Network:** security groups only allow internet → ALB on 80/443, ALB → app on 8000, and app → DB on 5432. Tasks have no public IPs and no route to the internet, and the DB subnets have no route out either.
 - **Access control:**
   - API requests need an `X-API-Key` header. The app only stores a SHA-256 hash of the key, in Secrets Manager.
   - IAM roles are scoped to this project's resources. The ECS task role has no permissions; the execution role can only pull this image, read its two secrets and write its log group.
@@ -88,10 +89,10 @@ GitHub Actions, four workflows:
 
 - **`validation.yaml`** runs on every pull request, and is called by the other workflows. It only runs the parts that changed:
   - Always: gitleaks.
-  - App changes: ruff, mypy and pytest against PostgreSQL; Bandit, Semgrep and pip-audit; image build with a Trivy scan.
+  - App changes: ruff, mypy and pytest against PostgreSQL; Bandit, Semgrep and pip-audit.
   - Infra changes: terraform fmt and validate, tflint, Checkov and Trivy.
-  - Semgrep, Trivy and Checkov results are uploaded to GitHub code scanning.
-- **`build.yaml`** is called by `deploy.yaml`. It builds the image, scans it with Trivy (fails on fixable HIGH/CRITICAL), pushes it to ECR tagged with the commit SHA, signs it with cosign and attaches an SBOM. It uses a role that can only push to the ECR repository.
+  - Semgrep and Checkov results are uploaded to GitHub code scanning.
+- **`build.yaml`** is called by `deploy.yaml`. It builds the image, scans it with Trivy (fails on fixable HIGH/CRITICAL), pushes it to ECR tagged with the short commit SHA (7 characters) and uploads an SBOM as a workflow artifact. It uses a role that can only push to the ECR repository.
 - **`deploy.yaml`** runs on merge to `main` when `app/` changes: validation, then build, then deploy. The deploy job needs manual approval (GitHub environment `production`), then registers a new task definition, runs the database migration, updates the ECS service and smoke-tests the live endpoint.
 - **`terraform.yaml`** runs when `infra/` changes. Pull requests get the plan as a comment. On merge to `main` it runs validation, plans, waits for manual approval (environment `infra`) and applies.
 
@@ -99,11 +100,10 @@ Terraform owns the task definition; the deploy copies the latest revision and on
 
 ## Trade-offs
 
-These choices keep the dev environment cheap (about $3–4 per day). All of them can be changed with variables:
+These choices keep the dev environment cheap (about $4 per day). All of them can be changed with variables:
 
-- **Single NAT gateway:** one per AZ in production.
 - **Single-AZ RDS:** set `db_multi_az = true`.
 - **Self-signed certificate on the ALB when no domain is configured:** set `domain_name` and `route53_zone_id` to use ACM with DNS validation.
-- **No VPC interface endpoints:** set `enable_interface_endpoints = true`.
+- **VPC endpoints instead of a NAT gateway:** adds about $0.85 a day over a NAT. Set `enable_interface_endpoints = false` to fall back to a single NAT gateway.
 
 RDS rotates the master password every 7 days. Tasks read the password at startup, so a rotation needs a forced redeploy (`aws ecs update-service --force-new-deployment`). In production the app would use IAM database authentication instead.

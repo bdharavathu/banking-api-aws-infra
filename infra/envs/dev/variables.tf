@@ -68,7 +68,7 @@ variable "enable_waf" {
 
 variable "enable_interface_endpoints" {
   type    = bool
-  default = false
+  default = true
 }
 
 variable "enable_cloudtrail" {

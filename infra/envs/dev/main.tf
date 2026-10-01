@@ -30,6 +30,10 @@ module "security_groups" {
   vpc_id                = module.network.vpc_id
   app_port              = local.app_port
   allowed_ingress_cidrs = var.allowed_ingress_cidrs
+
+  enable_interface_endpoints  = var.enable_interface_endpoints
+  endpoints_security_group_id = module.network.endpoints_security_group_id
+  s3_prefix_list_id           = module.network.s3_prefix_list_id
 }
 
 module "alb" {

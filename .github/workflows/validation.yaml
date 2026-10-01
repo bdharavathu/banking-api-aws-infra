@@ -2,7 +2,6 @@ name: validation
 
 on:
   pull_request:
-  workflow_dispatch:
   workflow_call:
     inputs:
       app:
@@ -40,9 +39,6 @@ jobs:
             infra=false
             grep -qE '^(app/|scripts/|\.github/workflows/(validation|build|deploy))' <<<"$files" && app=true
             grep -qE '^(infra/|\.checkov|\.tflint|\.trivyignore|\.github/workflows/(validation|terraform))' <<<"$files" && infra=true
-          elif [ "$EVENT" = "workflow_dispatch" ]; then
-            app=true
-            infra=true
           else
             app=$INPUT_APP
             infra=$INPUT_INFRA
@@ -142,48 +138,6 @@ jobs:
           uv export --no-dev --no-emit-project --format requirements-txt --locked -q -o /tmp/requirements.txt
           diff -u -I '^#' requirements.txt /tmp/requirements.txt
           uv run pip-audit --requirement requirements.txt --require-hashes --disable-pip --strict
-
-  image:
-    name: Image build and scan
-    needs: [changes, app]
-    if: needs.changes.outputs.app == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: app
-          load: true
-          tags: banking-api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: banking-api:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
-      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        if: always()
-        continue-on-error: true
-        with:
-          image-ref: banking-api:${{ github.sha }}
-          format: sarif
-          output: trivy-image.sarif
-          skip-setup-trivy: true
-      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
-        if: always() && hashFiles('trivy-image.sarif') != ''
-        continue-on-error: true
-        with:
-          sarif_file: trivy-image.sarif
-          category: trivy-image
 
   terraform:
     name: Terraform checks

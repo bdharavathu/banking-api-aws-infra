@@ -53,13 +53,7 @@ If the account already has the GitHub OIDC provider, add `-var create_oidc_provi
 
 ## 4. Create the infrastructure
 
-Run the `terraform` workflow (Actions → terraform → Run workflow), review the plan in the job summary and approve the `infra` deployment. The first run takes about 15 minutes, mostly RDS.
-
-Then set `AWS_APP_BUILD_ROLE_ARN` and `AWS_APP_DEPLOY_ROLE_ARN` from the Terraform outputs, and confirm the SNS subscription email AWS sends to `ALERT_EMAIL`.
-
-Later changes under `infra/` run the same workflow: the plan is posted on the pull request, and merging to `main` plans again and waits for approval before applying.
-
-To run Terraform from your machine instead of the workflow:
+Create the infrastructure the first time from your machine, because the pipeline needs the roles and variables from this step:
 
 ```bash
 cd infra/envs/dev
@@ -69,11 +63,15 @@ terraform init -backend-config=backend.hcl
 terraform apply
 ```
 
-Fill in `backend.hcl` from the bootstrap outputs, and `terraform.tfvars` with your values.
+Fill in `backend.hcl` from the bootstrap outputs, and `terraform.tfvars` with your values. The first apply takes about 15 minutes, mostly RDS.
+
+Then set `AWS_APP_BUILD_ROLE_ARN` and `AWS_APP_DEPLOY_ROLE_ARN` from the Terraform outputs, and confirm the SNS subscription email AWS sends to `ALERT_EMAIL`.
+
+Later changes under `infra/` go through the `terraform` workflow: the plan is posted on the pull request, and merging to `main` plans again, waits for approval and applies.
 
 ## 5. Deploy the app
 
-Push a change under `app/` to `main`, or run the `deploy` workflow manually. It runs validation, builds and pushes the image, then waits for your approval on `production` before deploying and running the smoke test.
+Push a change under `app/` to `main`. It runs validation, builds and pushes the image, then waits for your approval on `production` before deploying and running the smoke test.
 
 The infrastructure must exist first, because the image is pushed to the ECR repository Terraform creates.
 

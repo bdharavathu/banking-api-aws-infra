@@ -164,11 +164,6 @@ data "aws_iam_policy_document" "state_read" {
     actions   = ["kms:Decrypt", "kms:DescribeKey"]
     resources = [aws_kms_key.state.arn]
   }
-  statement {
-    sid       = "ReadProjectSecretsForRefresh"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = ["arn:aws:secretsmanager:${var.region}:${local.account_id}:secret:${local.resource_glob}"]
-  }
 }
 
 data "aws_iam_policy_document" "state_write" {

@@ -1,7 +1,7 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Local-only docker compose development key and its hash"
 regexes = [
   '''^local-dev-key$''',

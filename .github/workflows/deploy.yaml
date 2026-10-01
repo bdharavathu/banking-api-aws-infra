@@ -9,7 +9,6 @@ on:
       - ".github/workflows/build.yaml"
       - ".github/workflows/deploy.yaml"
       - ".github/workflows/validation.yaml"
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,7 +46,7 @@ jobs:
       id-token: write
     env:
       IMAGE: ${{ needs.build.outputs.image }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ needs.build.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,11 +59,12 @@ jobs:
 
       - name: Load deploy parameters
         run: |
-          aws ssm get-parameters-by-path --path /banking-api/dev/deploy --with-decryption \
-            --query 'Parameters[].[Name,Value]' --output text |
+          params=$(aws ssm get-parameters-by-path --path /banking-api/dev/deploy --with-decryption \
+            --query 'Parameters[].[Name,Value]' --output text)
+          [ -n "$params" ] || { echo "::error::no deploy parameters found"; exit 1; }
           while read -r name value; do
             echo "$(basename "$name" | tr '[:lower:]' '[:upper:]')=$value" >> "$GITHUB_ENV"
-          done
+          done <<<"$params"
 
       - name: Register task definition
         id: taskdef

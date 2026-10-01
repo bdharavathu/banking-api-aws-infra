@@ -6,7 +6,7 @@ data "aws_availability_zones" "available" {
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
   interface_endpoints = var.enable_interface_endpoints ? toset([
-    "ecr.api", "ecr.dkr", "logs", "secretsmanager", "ssm",
+    "ecr.api", "ecr.dkr", "logs", "secretsmanager",
   ]) : toset([])
 }
 
@@ -52,12 +52,14 @@ resource "aws_subnet" "database" {
 }
 
 resource "aws_eip" "nat" {
+  count  = var.enable_interface_endpoints ? 0 : 1
   domain = "vpc"
   tags   = { Name = "${var.name}-nat" }
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
+  count         = var.enable_interface_endpoints ? 0 : 1
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
   tags          = { Name = var.name }
   depends_on    = [aws_internet_gateway.this]
@@ -74,9 +76,12 @@ resource "aws_route_table" "public" {
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this.id
+  dynamic "route" {
+    for_each = aws_nat_gateway.this
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = route.value.id
+    }
   }
   tags = { Name = "${var.name}-app" }
 }

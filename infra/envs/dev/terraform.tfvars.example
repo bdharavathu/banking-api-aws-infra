@@ -7,7 +7,7 @@ alert_email = "you@example.com"
 # domain_name     = "api.example.com"
 # route53_zone_id = "Z0123456789ABCDEFGHIJ"
 
-# enable_interface_endpoints = true
+# enable_interface_endpoints = false
 # enable_guardduty           = false
 # enable_securityhub         = true
 # ephemeral                  = false

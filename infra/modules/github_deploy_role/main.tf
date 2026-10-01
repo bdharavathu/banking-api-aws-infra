@@ -112,9 +112,12 @@ data "aws_iam_policy_document" "deploy" {
   }
 
   statement {
-    sid       = "DeployParameters"
-    actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
-    resources = ["arn:aws:ssm:${var.region}:${var.account_id}:parameter${var.ssm_prefix}/*"]
+    sid     = "DeployParameters"
+    actions = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
+    resources = [
+      "arn:aws:ssm:${var.region}:${var.account_id}:parameter${var.ssm_prefix}",
+      "arn:aws:ssm:${var.region}:${var.account_id}:parameter${var.ssm_prefix}/*",
+    ]
   }
 
   statement {

@@ -9,7 +9,7 @@ permissions:
 jobs:
   changes:
     name: Detect changes
-    runs-on: ubuntu-24.04
+    runs-on: codebuild-bankapp-api-${{ github.run_id }}-${{ github.run_attempt }}
     outputs:
       app: ${{ steps.filter.outputs.app }}
       infra: ${{ steps.filter.outputs.infra }}

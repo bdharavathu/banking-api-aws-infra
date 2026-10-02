@@ -6,7 +6,7 @@ A REST API for bank accounts (balance, deposit, withdraw), deployed to AWS with 
 - `infra/bootstrap/`: Terraform state bucket and GitHub OIDC roles
 - `infra/modules/`: network, ALB/WAF, ECS, RDS, ECR, KMS, monitoring, audit
 - `infra/envs/dev/`: dev environment
-- `.github/workflows/`: `validation.yaml`, `build.yaml`, `deploy.yaml` (validation → build → deploy with manual approval), `terraform.yaml` (runs on infra changes)
+- `.github/workflows/`: `validation.yaml` (pull requests), `build.yaml` and `deploy.yaml` (after a merge: build → deploy, with manual approval), `terraform.yaml` (runs on infra changes)
 
 ## Run locally
 

@@ -61,11 +61,11 @@ The schema is managed with Alembic. The deploy pipeline runs `alembic upgrade he
 - **Access control:**
   - API requests need an `X-API-Key` header. The app only stores a SHA-256 hash of the key, in Secrets Manager.
   - IAM roles are scoped to this project's resources. The ECS task role has no permissions; the execution role can only pull this image, read its two secrets and write its log group.
-  - GitHub Actions authenticates to AWS with OIDC, so no AWS keys are stored in GitHub. The plan role is read-only. The apply and deploy roles can only be assumed by jobs in the `production` environment, which requires manual approval.
-- **Encryption at rest:** KMS customer-managed keys for RDS, Secrets Manager, ECR, SNS, SSM parameters, CloudWatch Logs and CloudTrail. Terraform state is in an encrypted, versioned S3 bucket.
+  - GitHub Actions authenticates to AWS with OIDC, so no AWS keys are stored in GitHub. The plan role is read-only and can be used from pull requests. The apply role can only be assumed by jobs in the `infra` environment and the deploy role by jobs in the `production` environment, and both environments require manual approval. The build role can only push images to ECR and is limited to `main`.
+- **Encryption at rest:** KMS customer-managed keys for RDS, Secrets Manager, ECR, SNS, SSM parameters, CloudWatch Logs and CloudTrail (when enabled). Terraform state is in an encrypted, versioned S3 bucket.
 - **Encryption in transit:** TLS from client to ALB. The app connects to RDS with `sslmode=verify-full` using the RDS CA bundle. Bucket policies deny non-TLS access.
 - **Container:** the base image is pinned by digest and dependencies are hash-pinned. The image runs as a non-root user with a read-only root filesystem and all Linux capabilities dropped.
-- **Audit:** CloudTrail, GuardDuty and VPC flow logs.
+- **Audit:** GuardDuty and VPC flow logs. CloudTrail is available with `enable_cloudtrail = true` and is off by default.
 
 ## Monitoring and logging
 

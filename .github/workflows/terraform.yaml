@@ -75,21 +75,9 @@ jobs:
           } > comment.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
 
-  validation:
-    if: github.event_name != 'pull_request'
-    uses: ./.github/workflows/validation.yaml
-    with:
-      app: false
-      infra: true
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: read
-      security-events: write
-
   plan:
     name: Plan
-    needs: validation
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
       contents: read

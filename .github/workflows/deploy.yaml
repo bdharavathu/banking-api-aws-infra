@@ -18,19 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validation:
-    uses: ./.github/workflows/validation.yaml
-    with:
-      app: true
-      infra: false
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: read
-      security-events: write
-
   build:
-    needs: validation
     uses: ./.github/workflows/build.yaml
     permissions:
       contents: read

@@ -87,14 +87,14 @@ The schema is managed with Alembic. The deploy pipeline runs `alembic upgrade he
 
 GitHub Actions, four workflows:
 
-- **`validation.yaml`** runs on every pull request, and is called by the other workflows. It only runs the parts that changed:
+- **`validation.yaml`** runs on every pull request and only runs the parts that changed. Branch protection should require it to pass before a merge:
   - Always: gitleaks.
   - App changes: ruff, mypy and pytest against PostgreSQL; Bandit, Semgrep and pip-audit.
   - Infra changes: terraform fmt and validate, tflint, Checkov and Trivy.
   - Semgrep and Checkov results are uploaded to GitHub code scanning.
-- **`build.yaml`** is called by `deploy.yaml`. It builds the image, scans it with Trivy (fails on fixable HIGH/CRITICAL), pushes it to ECR tagged with the short commit SHA (7 characters) and uploads an SBOM as a workflow artifact. It uses a role that can only push to the ECR repository.
-- **`deploy.yaml`** runs on merge to `main` when `app/` changes: validation, then build, then deploy. The deploy job needs manual approval (GitHub environment `production`), then registers a new task definition, runs the database migration, updates the ECS service and smoke-tests the live endpoint.
-- **`terraform.yaml`** runs when `infra/` changes. Pull requests get the plan as a comment. On merge to `main` it runs validation, plans, waits for manual approval (environment `infra`) and applies.
+- **`build.yaml`** is called by `deploy.yaml` after a merge. It builds the image, scans it with Trivy (fails on fixable HIGH/CRITICAL), pushes it to ECR tagged with the short commit SHA (7 characters) and uploads an SBOM as a workflow artifact. It uses a role that can only push to the ECR repository.
+- **`deploy.yaml`** runs on merge to `main` when `app/` changes: build, then deploy. The deploy job needs manual approval (GitHub environment `production`), then registers a new task definition, runs the database migration, updates the ECS service and smoke-tests the live endpoint.
+- **`terraform.yaml`** runs when `infra/` changes. Pull requests get the plan as a comment. On merge to `main` it plans, waits for manual approval (environment `infra`) and applies.
 
 Terraform owns the task definition; the deploy copies the latest revision and only changes the image. A change to the task definition in Terraform (for example a new environment variable) therefore takes effect on the next app deploy.
 

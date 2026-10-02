@@ -71,7 +71,7 @@ Later changes under `infra/` go through the `terraform` workflow: the plan is po
 
 ## 5. Deploy the app
 
-Push a change under `app/` to `main`. It runs validation, builds and pushes the image, then waits for your approval on `production` before deploying and running the smoke test.
+Push a change under `app/` to `main`. It builds, scans and pushes the image, then waits for your approval on `production` before deploying and running the smoke test.
 
 The infrastructure must exist first, because the image is pushed to the ECR repository Terraform creates.
 

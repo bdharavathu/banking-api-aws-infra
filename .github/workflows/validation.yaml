@@ -2,14 +2,6 @@ name: validation
 
 on:
   pull_request:
-  workflow_call:
-    inputs:
-      app:
-        type: boolean
-        default: true
-      infra:
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -28,21 +20,13 @@ jobs:
           persist-credentials: false
       - id: filter
         env:
-          EVENT: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
-          INPUT_APP: ${{ inputs.app }}
-          INPUT_INFRA: ${{ inputs.infra }}
         run: |
-          if [ "$EVENT" = "pull_request" ]; then
-            files=$(git diff --name-only "origin/$BASE_REF...HEAD")
-            app=false
-            infra=false
-            grep -qE '^(app/|scripts/|\.github/workflows/(validation|build|deploy))' <<<"$files" && app=true
-            grep -qE '^(infra/|\.checkov|\.tflint|\.trivyignore|\.github/workflows/(validation|terraform))' <<<"$files" && infra=true
-          else
-            app=$INPUT_APP
-            infra=$INPUT_INFRA
-          fi
+          files=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          app=false
+          infra=false
+          grep -qE '^(app/|scripts/|\.github/workflows/(validation|build|deploy))' <<<"$files" && app=true
+          grep -qE '^(infra/|\.checkov|\.tflint|\.trivyignore|\.github/workflows/(validation|terraform))' <<<"$files" && infra=true
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "infra=$infra" >> "$GITHUB_OUTPUT"
 

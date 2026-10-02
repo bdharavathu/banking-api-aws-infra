@@ -38,6 +38,11 @@ def get_account(session: Session, account_id: uuid.UUID) -> Account:
         raise AccountNotFoundError
     return account
 
+def get_accounts(session: Session, account_id: uuid.UUID) -> Account:
+    accounts = session.get(Account)
+    if accounts is None:
+        raise AccountNotFoundError
+    return accounts
 
 def list_transactions(session: Session, account_id: uuid.UUID, limit: int) -> list[Transaction]:
     get_account(session, account_id)

@@ -63,6 +63,10 @@ def create_account(body: AccountCreate, session: SessionDep) -> AccountOut:
 def get_account(account_id: UUID, session: SessionDep) -> AccountOut:
     return AccountOut.model_validate(services.get_account(session, account_id))
 
+@accounts_router.get("/accounts")
+def get_accounts(session: SessionDep) -> AccountOut:
+    return AccountOut.model_validate(services.get_accounts(session))
+
 
 @accounts_router.get("/{account_id}/balance")
 def get_balance(account_id: UUID, session: SessionDep) -> BalanceOut:

@@ -8,7 +8,6 @@ on:
       - "scripts/smoke-test.sh"
       - ".github/workflows/build.yaml"
       - ".github/workflows/deploy.yaml"
-      - ".github/workflows/validation.yaml"
 
 permissions:
   contents: read
@@ -99,10 +98,14 @@ jobs:
           aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
             --task-definition "$TASK_DEF" >/dev/null
           aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
-          read -r running state < <(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-            --query "services[0].deployments[?status=='PRIMARY'] | [0].[taskDefinition,rolloutState]" --output text)
+          for _ in $(seq 1 30); do
+            read -r running state < <(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+              --query "services[0].deployments[?status=='PRIMARY'] | [0].[taskDefinition,rolloutState]" --output text)
+            [ "$state" != "IN_PROGRESS" ] && break
+            sleep 10
+          done
           if [ "$running" != "$TASK_DEF" ] || [ "$state" != "COMPLETED" ]; then
-            echo "::error::Deployment rolled back (running=$running state=$state)"
+            echo "::error::Deployment did not complete (running=$running state=$state)"
             exit 1
           fi
 
